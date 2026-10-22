@@ -47,7 +47,6 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 
@@ -105,13 +104,6 @@ static int msi_raw_request(struct hid_device *hdev, unsigned char reportnum,
 	    len >= MSI_REPORT_LEN) {
 		memcpy(mk->last_packet, buf, MSI_REPORT_LEN);
 		mk->last_valid = true;
-
-		/* Traza de depuracion (dynamic debug): dice que programa manda
-		 * cada paquete.  Desactivada por defecto para no llenar el log
-		 * cuando se arrastra un deslizador. */
-		pr_debug("rgb-backlight: paquete del teclado desde %s (modo=%u brillo=%u)\n",
-			 current->comm, buf[MSI_OFFSET_MODE],
-			 buf[MSI_OFFSET_BRIGHTNESS]);
 	}
 
 	return mk->orig_ll->raw_request(hdev, reportnum, buf, len, rtype,
@@ -142,9 +134,13 @@ static int msi_send(struct msi_kbd *mk, const struct msi_config *cfg)
 	if (mk->last_valid)
 		memcpy(buf, mk->last_packet, MSI_REPORT_LEN);
 	else {
+		/* Estado por defecto del firmware: estatico, blanco y al maximo.
+		 * Asi la primera escritura (p. ej. el color del perfil) no lo
+		 * deja apagado hasta que llegue el brillo. */
 		memset(buf, 0, MSI_REPORT_LEN);
 		buf[0] = MSI_REPORT_ID;
 		buf[MSI_OFFSET_MODE] = MSI_MODE_STATIC;
+		buf[MSI_OFFSET_BRIGHTNESS] = MSI_BRIGHTNESS_MAX;
 		buf[MSI_OFFSET_NUM_COLORS] = 1;
 		buf[MSI_OFFSET_COLOR + 0] = 0xff;
 		buf[MSI_OFFSET_COLOR + 1] = 0xff;
@@ -188,10 +184,6 @@ static int msi_led_set_brightness(struct led_classdev *ledc,
 
 	if (msi_shutting_down)
 		return 0;
-
-	/* Traza de depuracion (dynamic debug): quien cambia el brillo. */
-	pr_debug("rgb-backlight: brillo del teclado -> %u (desde %s)\n",
-		 brightness, current->comm);
 
 	return msi_send(mk, &cfg);
 }
@@ -374,23 +366,6 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr,
 	return ret < 0 ? ret : count;
 }
 
-/*
- * El firmware del teclado lo enciende en "verde estatico" al arrancar.  Lo
- * apagamos: se manda el mismo paquete con brillo 0, que el firmware aplica
- * igual que un color normal pero a intensidad cero.
- *
- * El paquete se memoriza (como los de OpenRGB) para que al mover el
- * deslizador de brillo el teclado vuelva a encenderse con su color.
- */
-static void msi_start_off(struct msi_kbd *mk)
-{
-	/* led_set_brightness() actualiza tambien el valor cacheado del LED
-	 * virtual, de modo que el panel reflete de verdad que el teclado
-	 * esta apagado. */
-	pr_info("rgb-backlight: apagando el teclado al detectarlo\n");
-	led_set_brightness(&mk->led, 0);
-}
-
 static int msi_probe(struct hid_device *hdev, const struct hid_device_id *id)
 {
 	struct msi_kbd *mk;
@@ -441,8 +416,10 @@ static int msi_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		return ret;
 	}
 
-	/* Apagado al arrancar (el firmware lo enciende en verde) */
-	msi_start_off(mk);
+	/* No se manda nada al detectar el teclado: se enciende con lo que
+	 * tenga el firmware y el perfil (rgb-backlight-restore.service) lo
+	 * pone como estaba.  El primer paquete se construye a partir del
+	 * estado por defecto del firmware. */
 
 	dev_info(&hdev->dev, "backlight exposed as LED '%s' (max %u)\n",
 		 mk->led.name, mk->led.max_brightness);
@@ -573,12 +550,12 @@ static int razer_send_one(struct device *dev, void *data)
 		return 0;
 
 	memcpy(buf, pkt, RAZER_REPORT_LEN);
+	/* Mejor esfuerzo: si otro dispositivo Razer no acepta el paquete, se
+	 * ignora; el nuestro se comprueba al leer su estado. */
 	ret = hid_hw_raw_request(hdev, buf[0], buf, RAZER_REPORT_LEN,
 				 HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
+	(void)ret;
 	kfree(buf);
-
-	if (ret < 0)
-		dev_dbg(&hdev->dev, "razer: request failed: %d\n", ret);
 
 	return 0;
 }

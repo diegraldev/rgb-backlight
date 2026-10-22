@@ -44,12 +44,12 @@ brillo sin perder el color ni el efecto que haya puesto OpenRGB, el módulo
 `hid-razer` en el árbol de Linux) e **intercepta todos los paquetes** que se
 envían al teclado. El último se memoriza y se reenvía con el brillo nuevo.
 
-Además, el firmware del teclado lo enciende por su cuenta (en *blanco
-estático*) cuando el dispositivo termina de inicializarse, así que el
-módulo lo apaga en cuanto lo detecta **y** hay un servicio de usuario que
-vuelve a apagarlo al iniciar la sesión de Plasma (ver más abajo). Al mover
-el deslizador vuelve a encenderse con el color memorizado. Si OpenRGB está
-abierto, su perfil se aplica después y gana, como es lógico.
+El firmware del teclado lo enciende por su cuenta (en *blanco estático*)
+cuando el dispositivo termina de inicializarse, y el módulo no sabe en qué
+estado está hasta que alguien escribe. De eso se encarga el **perfil** (ver
+más abajo): se aplica en cuanto arranca el sistema, así que el blanco del
+firmware solo se ve un instante. Si OpenRGB está abierto, su perfil se
+aplica después y gana, como es lógico.
 
 **Ratón Razer.** Aquí el brillo es un comando independiente, así que no hace
 falta interceptar nada: se habla directamente el protocolo *Razer device
@@ -195,15 +195,15 @@ También se puede manejar a mano:
 
 ### Por qué se desactiva `systemd-backlight`
 
-systemd guarda el brillo de los LED al apagar y lo restaura al arrancar
-(`systemd-backlight@leds:...service`). Con estos dispositivos eso es un
-problema: el valor guardado se aplica **después** de que el módulo haya
-apagado el teclado, y el módulo, al aplicar ese brillo, reenvía el último
-paquete con su color por defecto. Resultado: teclado blanco al arrancar.
+systemd también guarda el brillo de los LED al apagar y lo restaura al
+arrancar (`systemd-backlight@leds:...service`). Eso escribe el LED por su
+cuenta y, como el módulo reenvía un paquete completo al cambiar el brillo,
+acaba encendiendo el teclado en blanco antes de que el perfil haga su
+trabajo.
 
-`install.sh` enmascara esas dos instancias para que systemd no toque los LED
-del teclado ni del ratón; la persistencia la lleva el perfil, que sí conoce
-colores, efectos y velocidad.
+`install.sh` enmascara esas dos instancias para que la única fuente de
+verdad sea el perfil, que además del brillo guarda colores, efecto y
+velocidad.
 
 ### Si el widget se actualiza desde GitHub y se pierden los cambios
 
