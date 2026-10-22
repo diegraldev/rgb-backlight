@@ -44,6 +44,12 @@ brillo sin perder el color ni el efecto que haya puesto OpenRGB, el módulo
 `hid-razer` en el árbol de Linux) e **intercepta todos los paquetes** que se
 envían al teclado. El último se memoriza y se reenvía con el brillo nuevo.
 
+Además, el firmware del teclado lo enciende en *verde estático* al arrancar.
+Como el módulo ya sabe hablar su protocolo, **lo apaga** al detectarlo (el
+LED virtual queda al 0 % y el panel lo refleja fielmente). Al mover el
+deslizador vuelve a encenderse con el color memorizado. Si OpenRGB está
+abierto, su perfil se aplica después y gana, como es lógico.
+
 **Ratón Razer.** Aquí el brillo es un comando independiente, así que no hace
 falta interceptar nada: se habla directamente el protocolo *Razer device
 command*. Detalle importante: **Linux no deja enviar ese `feature report`
@@ -167,9 +173,11 @@ sudo ~/rgb-backlight/uninstall.sh
 
 ## Limitaciones conocidas
 
-* El **ratón** solo se controla con los efectos que su firmware implementa
-  (los siete documentados arriba). El **teclado** es más completo porque su
-  protocolo admite más modos.
+* El **ratón** guarda su propio estado en memoria, así que al arrancar
+  conserva el último lighting que tuviera. El **teclado**, en cambio, lo
+  apagamos nosotros al arrancar (su firmware lo enciende en verde).
+* El brillo que muestra el panel es el último que aplicó este proyecto; no
+  se lee del hardware (el Razer sí lo permitiría, el MSI no).
 * Si el ratón está en un modo de efecto, el selector de color deja de verse
   (es el propio firmware quien ignora el color).
 * El brillo del teclado pasa por UPower, así que **OpenRGB y el panel KDE se

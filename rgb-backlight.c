@@ -362,6 +362,22 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr,
 	return ret < 0 ? ret : count;
 }
 
+/*
+ * El firmware del teclado lo enciende en "verde estatico" al arrancar.  Lo
+ * apagamos: se manda el mismo paquete con brillo 0, que el firmware aplica
+ * igual que un color normal pero a intensidad cero.
+ *
+ * El paquete se memoriza (como los de OpenRGB) para que al mover el
+ * deslizador de brillo el teclado vuelva a encenderse con su color.
+ */
+static void msi_start_off(struct msi_kbd *mk)
+{
+	/* led_set_brightness() actualiza tambien el valor cacheado del LED
+	 * virtual, de modo que el panel reflete de verdad que el teclado
+	 * esta apagado. */
+	led_set_brightness(&mk->led, 0);
+}
+
 static int msi_probe(struct hid_device *hdev, const struct hid_device_id *id)
 {
 	struct msi_kbd *mk;
@@ -411,6 +427,9 @@ static int msi_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		hdev->ll_driver = mk->orig_ll;
 		return ret;
 	}
+
+	/* Apagado al arrancar (el firmware lo enciende en verde) */
+	msi_start_off(mk);
 
 	dev_info(&hdev->dev, "backlight exposed as LED '%s' (max %u)\n",
 		 mk->led.name, mk->led.max_brightness);
