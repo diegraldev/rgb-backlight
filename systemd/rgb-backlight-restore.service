@@ -1,0 +1,14 @@
+[Unit]
+Description=rgb-backlight: aplica el perfil RGB al arrancar
+Documentation=https://github.com/diegraldev/rgb-backlight
+After=systemd-modules-load.service upower.service
+Wants=upower.service
+ConditionPathExists=/var/lib/rgb-backlight/owner
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/rgb-backlight/rgb-profile.sh restore
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

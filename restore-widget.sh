@@ -2,7 +2,7 @@
 #
 # Restaura los cambios del widget KDE Control Station (seccion "Keyboard RGB").
 #
-#   ~/msi-kbd-backlight/restore-widget.sh
+#   ~/rgb-backlight/restore-widget.sh
 #
 # Util cuando el widget se actualiza desde GitHub y se pierden los cambios.
 #

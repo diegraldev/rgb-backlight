@@ -141,7 +141,8 @@ sudo ./install.sh
 3. instala las reglas **udev** que permiten al usuario escribir los atributos
    y desactiva `systemd-backlight` para estos LED;
 4. habilita la carga automática del módulo;
-5. instala el **perfil** y el servicio de sesión que lo restaura al iniciar Plasma;
+5. instala el **perfil** y los dos servicios que lo aplican: al arrancar el
+   sistema y al iniciar sesión;
 6. reinicia `upower` y `powerdevil`.
 
 Después, en el widget *KDE Control Station* → *Edit controls* → *Add new item* →
@@ -152,7 +153,7 @@ Después, en el widget *KDE Control Station* → *Edit controls* → *Add new it
 Encender la PC y encontrarte el teclado en blanco y el ratón con otro color
 es lo normal: cada dispositivo arranca con lo que le apetece. Este proyecto
 lo resuelve guardando un **perfil** con el estado de cada dispositivo y
-devolviéndolo al iniciar sesión.
+devolviéndolo al arrancar.
 
 * **Guardar**: lo hace el plugin del widget, en cada cambio que aplicas
   (`~/.config/rgb-backlight/<dispositivo>.state`). Las escrituras se agrupan
@@ -168,9 +169,18 @@ devolviéndolo al iniciar sesión.
   brightness=100
   ```
 
-* **Restaurar**: lo hace `rgb-backlight-session.service` al iniciar sesión,
-  aplicando el perfil por la misma vía que el panel (UPower para el brillo del
-  teclado, sysfs para el resto) y escribiendo solo lo que haya cambiado.
+* **Restaurar al arrancar**: `rgb-backlight-restore.service` (servicio de
+  sistema) aplica el perfil en cuanto el sistema está listo, **antes de que
+  entres**, así que el teclado y el ratón ya están como los dejaste desde el
+  principio. El perfil es tuyo, no del sistema: el instalador anota de qué
+  usuario es en `/var/lib/rgb-backlight/owner` para que el servicio sepa de
+  dónde leerlo (el módulo del kernel no puede leer ficheros).
+
+* **Restaurar al iniciar sesión**: `rgb-backlight-session.service` lo vuelve a
+  aplicar al entrar, como red de seguridad por si PowerDevil o el firmware
+  tocaron algo entre medias. Ambos aplican el perfil por la misma vía que el
+  panel (UPower para el brillo del teclado, sysfs para el resto) y escriben
+  solo lo que haya cambiado.
 
 * **Reflejarse en el widget**: el plugin lee el estado directamente del módulo
   al abrir la página, así que lo que ves es siempre el estado real.

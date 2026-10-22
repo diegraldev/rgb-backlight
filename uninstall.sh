@@ -2,7 +2,7 @@
 #
 # Desinstala rgb-backlight (modulo kernel + plugin QML + reglas udev)
 #
-#   sudo ~/msi-kbd-backlight/uninstall.sh
+#   sudo ~/rgb-backlight/uninstall.sh
 #
 set -euo pipefail
 
@@ -38,6 +38,12 @@ echo "==> Limpiando configuracion"
 rm -f /etc/modules-load.d/rgb-backlight.conf
 rm -f /etc/udev/rules.d/99-rgb-backlight.rules
 rm -rf "/usr/src/${PKG}-${VER}"
+
+echo "==> Quitando el servicio de arranque"
+systemctl disable --now rgb-backlight-restore.service >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/rgb-backlight-restore.service
+rm -rf /usr/local/lib/rgb-backlight /var/lib/rgb-backlight
+systemctl daemon-reload
 
 echo "==> Reactivando la gestion de brillo de systemd"
 systemctl unmask systemd-backlight@leds:msi::kbd_backlight.service >/dev/null 2>&1 || true

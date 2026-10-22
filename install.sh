@@ -2,7 +2,7 @@
 #
 # Instalador de rgb-backlight (modulo kernel DKMS + plugin QML + reglas udev)
 #
-#   sudo ~/msi-kbd-backlight/install.sh
+#   sudo ~/rgb-backlight/install.sh
 #
 set -euo pipefail
 
@@ -53,9 +53,25 @@ cat > /etc/modules-load.d/rgb-backlight.conf <<'EOF'
 rgb-backlight
 EOF
 
-echo "==> [5/7] Perfil y servicio de sesion (restaurar el estado al iniciar Plasma)"
+echo "==> [5/7] Perfil y servicios (aplicarlo al arrancar y al iniciar sesion)"
 USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
 USER_UID="$(id -u "${USER_NAME}")"
+
+# Copia del script en el sistema: la usa el servicio de arranque (root).
+install -d -m 755 /usr/local/lib/rgb-backlight
+install -m 755 "${SRC}/tools/rgb-profile.sh" /usr/local/lib/rgb-backlight/rgb-profile.sh
+
+# El perfil es del usuario, no del sistema: se anota cual es para que el
+# servicio de arranque sepa de quien leerlo (todavia no hay sesion).
+install -d -m 755 /var/lib/rgb-backlight
+printf '%s\n' "${USER_NAME}" > /var/lib/rgb-backlight/owner
+
+# Servicio de sistema: aplica el perfil en cuanto arranca la PC.
+install -m 644 "${SRC}/systemd/rgb-backlight-restore.service" \
+	/etc/systemd/system/rgb-backlight-restore.service
+systemctl daemon-reload
+systemctl enable rgb-backlight-restore.service >/dev/null 2>&1 || true
+
 install -d -m 755 "${USER_HOME}/.local/share/rgb-backlight"
 install -m 755 "${SRC}/tools/rgb-profile.sh" "${USER_HOME}/.local/share/rgb-backlight/rgb-profile.sh"
 rm -f "${USER_HOME}/.local/share/rgb-backlight/rgb-session-init.sh"
@@ -86,6 +102,7 @@ udevadm trigger --subsystem-match=leds --action=add || true
 systemctl restart upower || true
 
 echo "==> [7/7] Reiniciando upower y powerdevil"
+systemctl start rgb-backlight-restore.service >/dev/null 2>&1 || true
 if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && systemctl --user is-system-running >/dev/null 2>&1; then
 	systemctl --user restart plasma-powerdevil.service
 else
@@ -107,5 +124,5 @@ for led in /sys/class/leds/msi::kbd_backlight /sys/class/leds/razer::logo_backli
 	fi
 done
 echo
-echo "  Verificacion:  ~/msi-kbd-backlight/verify.sh"
-echo "  Desinstalar:   sudo ~/msi-kbd-backlight/uninstall.sh"
+echo "  Verificacion:  ~/rgb-backlight/verify.sh"
+echo "  Desinstalar:   sudo ~/rgb-backlight/uninstall.sh"

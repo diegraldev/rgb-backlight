@@ -2,7 +2,7 @@
 #
 # Verificacion de rgb-backlight
 #
-#   ~/msi-kbd-backlight/verify.sh
+#   ~/rgb-backlight/verify.sh
 #
 echo "=== Modulo cargado ==="
 lsmod | grep -E "rgb_backlight|msi_kbd_backlight" || echo "  !! no cargado"

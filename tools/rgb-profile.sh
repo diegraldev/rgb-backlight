@@ -8,20 +8,45 @@
 #
 # El plugin del widget guarda el perfil automaticamente cada vez que cambias
 # algo; este script sirve para hacerlo desde la linea de comandos y es el que
-# usa el servicio de sesion (rgb-backlight-session.service) para devolver los
-# dispositivos a su estado anterior al iniciar sesion.
+# usan los dos servicios que lo devuelven a su sitio:
+#
+#   rgb-backlight-restore.service  (sistema)  al arrancar la PC
+#   rgb-backlight-session.service  (usuario)  al iniciar sesion
 #
 # El perfil vive en ~/.config/rgb-backlight/<dispositivo>.state, en formato
 # clave=valor, de modo que se puede leer y editar a mano.
 #
 set -uo pipefail
 
-CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/rgb-backlight"
 KBD_LED=/sys/class/leds/msi::kbd_backlight
 MOUSE_LED=/sys/class/leds/razer::logo_backlight
 BUSCTL=/usr/bin/busctl
+OWNER_FILE=/var/lib/rgb-backlight/owner
 
 die() { echo "rgb-profile: $*" >&2; exit 1; }
+
+# El perfil es del usuario, no del sistema.  Cuando el script lo ejecuta root
+# al arrancar (todavia no hay sesion) se usa el perfil del usuario que anoto
+# el instalador en /var/lib/rgb-backlight/owner; ejecutado por el usuario, el
+# suyo.  RGB_PROFILE_DIR fuerza una ruta (pruebas).
+profile_dir() {
+	local owner home
+	if [[ -n "${RGB_PROFILE_DIR:-}" ]]; then
+		printf '%s' "${RGB_PROFILE_DIR}"
+		return 0
+	fi
+	if [[ "${EUID}" -eq 0 && -r "${OWNER_FILE}" ]]; then
+		owner="$(head -n1 "${OWNER_FILE}" 2>/dev/null)"
+		home="$(getent passwd "${owner}" | cut -d: -f6)"
+		if [[ -n "${home}" && -d "${home}" ]]; then
+			printf '%s/.config/rgb-backlight' "${home}"
+			return 0
+		fi
+	fi
+	printf '%s' "${XDG_CONFIG_HOME:-${HOME}/.config}/rgb-backlight"
+}
+
+CFG_DIR="$(profile_dir)"
 
 state_file() {
 	case "$1" in
@@ -74,9 +99,21 @@ wait_led() {   # <led> <segundos>
 }
 
 set_keyboard_brightness() {   # <valor crudo 0..max>
-	"${BUSCTL}" --system call org.freedesktop.UPower \
-		/org/freedesktop/UPower/KbdBacklight \
-		org.freedesktop.UPower.KbdBacklight SetBrightness i "$1" >/dev/null 2>&1
+	local i
+	[[ "$(read_attr "${KBD_LED}/brightness")" == "$1" ]] && return 0
+
+	# Se usa UPower (como el panel) para no dejar su valor cacheado desfasado.
+	for ((i = 1; i <= 6; i++)); do
+		"${BUSCTL}" --system call org.freedesktop.UPower \
+			/org/freedesktop/UPower/KbdBacklight \
+			org.freedesktop.UPower.KbdBacklight SetBrightness i "$1" >/dev/null 2>&1
+		[[ "$(read_attr "${KBD_LED}/brightness")" == "$1" ]] && return 0
+		sleep 0.5
+	done
+
+	# Muy pronto en el arranque UPower puede no estar listo: se escribe el
+	# LED directamente (el modulo hace lo mismo por dentro).
+	printf '%s' "$1" > "${KBD_LED}/brightness" 2>/dev/null
 }
 
 # --- guardar -------------------------------------------------------------

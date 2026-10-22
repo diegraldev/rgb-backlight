@@ -2,7 +2,7 @@
 #
 # Comprobacion rapida tras instalar/cargar rgb-backlight
 #
-#   ~/msi-kbd-backlight/test.sh
+#   ~/rgb-backlight/test.sh
 #
 set -uo pipefail
 
