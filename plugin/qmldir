@@ -1,0 +1,3 @@
+module org.rgb.backlight
+plugin rgbbacklightplugin
+classname RgbBacklightPlugin

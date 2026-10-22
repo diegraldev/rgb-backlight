@@ -1,0 +1,17 @@
+# Artefactos de compilacion
+*.o
+*.ko
+*.mod
+*.mod.c
+*.mod.o
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+*.a
+*.so
+
+# Editores
+*~
+.vscode/
+.idea/

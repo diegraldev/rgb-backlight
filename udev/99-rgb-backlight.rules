@@ -1,0 +1,17 @@
+# rgb-backlight: permite al usuario cambiar el color, el efecto y la
+# velocidad de los dispositivos RGB sin necesidad de root.
+#
+# El modulo del kernel crea estos atributos con permisos 0664 root:root,
+# asi que aqui se cambia el grupo propietario para que el usuario del
+# escritorio pueda escribirlos.
+#
+# @GROUP@ se sustituye por el grupo del usuario al instalar.
+
+# Teclado MSI Mystic Light (color, efecto y velocidad)
+ACTION=="add|change", SUBSYSTEM=="leds", KERNEL=="msi::kbd_backlight", \
+    RUN+="/usr/bin/chgrp @GROUP@ /sys/class/leds/msi::kbd_backlight/colors /sys/class/leds/msi::kbd_backlight/mode /sys/class/leds/msi::kbd_backlight/speed"
+
+# Raton Razer Viper Mini (color y efecto; el brillo lo crea la clase LED)
+ACTION=="add|change", SUBSYSTEM=="leds", KERNEL=="razer::logo_backlight", \
+    RUN+="/usr/bin/chgrp @GROUP@ /sys/class/leds/razer::logo_backlight/color /sys/class/leds/razer::logo_backlight/color2 /sys/class/leds/razer::logo_backlight/effect /sys/class/leds/razer::logo_backlight/speed /sys/class/leds/razer::logo_backlight/brightness", \
+    RUN+="/usr/bin/chmod g+w /sys/class/leds/razer::logo_backlight/brightness"
