@@ -106,11 +106,12 @@ static int msi_raw_request(struct hid_device *hdev, unsigned char reportnum,
 		memcpy(mk->last_packet, buf, MSI_REPORT_LEN);
 		mk->last_valid = true;
 
-		/* Se anota quien manda el paquete: sirve para averiguar que
-		 * programa (o el propio firmware) enciende el teclado. */
-		pr_info("rgb-backlight: paquete del teclado desde %s (modo=%u brillo=%u)\n",
-			current->comm, buf[MSI_OFFSET_MODE],
-			buf[MSI_OFFSET_BRIGHTNESS]);
+		/* Traza de depuracion (dynamic debug): dice que programa manda
+		 * cada paquete.  Desactivada por defecto para no llenar el log
+		 * cuando se arrastra un deslizador. */
+		pr_debug("rgb-backlight: paquete del teclado desde %s (modo=%u brillo=%u)\n",
+			 current->comm, buf[MSI_OFFSET_MODE],
+			 buf[MSI_OFFSET_BRIGHTNESS]);
 	}
 
 	return mk->orig_ll->raw_request(hdev, reportnum, buf, len, rtype,
@@ -188,9 +189,9 @@ static int msi_led_set_brightness(struct led_classdev *ledc,
 	if (msi_shutting_down)
 		return 0;
 
-	/* Se anota quien cambia el brillo (UPower, PowerDevil, el panel...) */
-	pr_info("rgb-backlight: brillo del teclado -> %u (desde %s)\n",
-		brightness, current->comm);
+	/* Traza de depuracion (dynamic debug): quien cambia el brillo. */
+	pr_debug("rgb-backlight: brillo del teclado -> %u (desde %s)\n",
+		 brightness, current->comm);
 
 	return msi_send(mk, &cfg);
 }
