@@ -47,6 +47,7 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 
@@ -104,6 +105,12 @@ static int msi_raw_request(struct hid_device *hdev, unsigned char reportnum,
 	    len >= MSI_REPORT_LEN) {
 		memcpy(mk->last_packet, buf, MSI_REPORT_LEN);
 		mk->last_valid = true;
+
+		/* Se anota quien manda el paquete: sirve para averiguar que
+		 * programa (o el propio firmware) enciende el teclado. */
+		pr_info("rgb-backlight: paquete del teclado desde %s (modo=%u brillo=%u)\n",
+			current->comm, buf[MSI_OFFSET_MODE],
+			buf[MSI_OFFSET_BRIGHTNESS]);
 	}
 
 	return mk->orig_ll->raw_request(hdev, reportnum, buf, len, rtype,
@@ -180,6 +187,10 @@ static int msi_led_set_brightness(struct led_classdev *ledc,
 
 	if (msi_shutting_down)
 		return 0;
+
+	/* Se anota quien cambia el brillo (UPower, PowerDevil, el panel...) */
+	pr_info("rgb-backlight: brillo del teclado -> %u (desde %s)\n",
+		brightness, current->comm);
 
 	return msi_send(mk, &cfg);
 }
@@ -375,6 +386,7 @@ static void msi_start_off(struct msi_kbd *mk)
 	/* led_set_brightness() actualiza tambien el valor cacheado del LED
 	 * virtual, de modo que el panel reflete de verdad que el teclado
 	 * esta apagado. */
+	pr_info("rgb-backlight: apagando el teclado al detectarlo\n");
 	led_set_brightness(&mk->led, 0);
 }
 

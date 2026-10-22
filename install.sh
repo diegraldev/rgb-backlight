@@ -20,7 +20,7 @@ fi
 USER_NAME="${SUDO_USER:-${USER}}"
 GROUP="$(id -gn "${USER_NAME}")"
 
-echo "==> [1/6] Modulo kernel"
+echo "==> [1/7] Modulo kernel"
 rm -rf "${DEST}"
 mkdir -p "${DEST}"
 cp "${SRC}/rgb-backlight.c" "${SRC}/Makefile" "${SRC}/dkms.conf" "${DEST}/"
@@ -28,7 +28,7 @@ dkms add -m "${PKG}" -v "${VER}" 2>/dev/null || true
 dkms build --force -m "${PKG}" -v "${VER}"
 dkms install --force -m "${PKG}" -v "${VER}"
 
-echo "==> [2/6] Plugin QML (org.rgb.backlight)"
+echo "==> [2/7] Plugin QML (org.rgb.backlight)"
 make -C "${SRC}/plugin" clean >/dev/null 2>&1 || true
 make -C "${SRC}/plugin"
 rm -rf /usr/lib64/qt6/qml/org/msi
@@ -36,14 +36,31 @@ install -d "${QMLDIR}"
 install -m 644 "${SRC}/plugin/librgbbacklightplugin.so" "${QMLDIR}/"
 install -m 644 "${SRC}/plugin/qmldir" "${QMLDIR}/"
 
-echo "==> [3/6] Reglas udev"
+echo "==> [3/7] Reglas udev"
 sed "s/@GROUP@/${GROUP}/" "${SRC}/udev/99-rgb-backlight.rules" > /etc/udev/rules.d/99-rgb-backlight.rules
 udevadm control --reload-rules
 
-echo "==> [4/6] Carga automatica"
+echo "==> [4/7] Carga automatica"
 cat > /etc/modules-load.d/rgb-backlight.conf <<'EOF'
 rgb-backlight
 EOF
+
+echo "==> [5/7] Servicio de sesion (apagar el teclado al iniciar Plasma)"
+USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
+USER_UID="$(id -u "${USER_NAME}")"
+install -d -m 755 "${USER_HOME}/.local/share/rgb-backlight"
+install -m 755 "${SRC}/tools/rgb-session-init.sh" "${USER_HOME}/.local/share/rgb-backlight/rgb-session-init.sh"
+install -d -m 755 "${USER_HOME}/.config/systemd/user"
+install -m 644 "${SRC}/systemd/rgb-backlight-session.service" "${USER_HOME}/.config/systemd/user/rgb-backlight-session.service"
+
+runuser -u "${USER_NAME}" -- env \
+	XDG_RUNTIME_DIR="/run/user/${USER_UID}" \
+	DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${USER_UID}/bus" \
+	systemctl --user daemon-reload >/dev/null 2>&1 || true
+runuser -u "${USER_NAME}" -- env \
+	XDG_RUNTIME_DIR="/run/user/${USER_UID}" \
+	DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${USER_UID}/bus" \
+	systemctl --user enable --now rgb-backlight-session.service || true
 
 # Si el modulo ya esta cargado, la version nueva se aplicara al reiniciar.
 if lsmod | grep -q rgb_backlight; then
@@ -53,13 +70,13 @@ if lsmod | grep -q rgb_backlight; then
 	exit 0
 fi
 
-echo "==> [5/6] Cargando el modulo"
+echo "==> [6/7] Cargando el modulo"
 modprobe rgb-backlight || true
 
 udevadm trigger --subsystem-match=leds --action=add || true
 systemctl restart upower || true
 
-echo "==> [6/6] Reiniciando upower y powerdevil"
+echo "==> [7/7] Reiniciando upower y powerdevil"
 if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && systemctl --user is-system-running >/dev/null 2>&1; then
 	systemctl --user restart plasma-powerdevil.service
 else

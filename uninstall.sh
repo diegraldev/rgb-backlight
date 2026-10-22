@@ -17,6 +17,17 @@ fi
 echo "==> Eliminando el plugin QML"
 rm -rf /usr/lib64/qt6/qml/org/rgb /usr/lib64/qt6/qml/org/msi
 
+echo "==> Eliminando el servicio de sesion"
+USER_NAME="${SUDO_USER:-${USER}}"
+USER_UID="$(id -u "${USER_NAME}" 2>/dev/null || echo 1000)"
+USER_HOME="$(getent passwd "${USER_NAME}" 2>/dev/null | cut -d: -f6)"
+runuser -u "${USER_NAME}" -- env \
+	XDG_RUNTIME_DIR="/run/user/${USER_UID}" \
+	DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${USER_UID}/bus" \
+	systemctl --user disable --now rgb-backlight-session.service >/dev/null 2>&1 || true
+rm -f "${USER_HOME}/.config/systemd/user/rgb-backlight-session.service"
+rm -rf "${USER_HOME}/.local/share/rgb-backlight"
+
 echo "==> Descargando el modulo"
 rmmod rgb_backlight 2>/dev/null || true
 

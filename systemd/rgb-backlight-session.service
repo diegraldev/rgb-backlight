@@ -1,0 +1,12 @@
+[Unit]
+Description=rgb-backlight: apaga la iluminacion del teclado al iniciar sesion
+Documentation=https://github.com/diegraldev/rgb-backlight
+After=plasma-plasmashell.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/rgb-backlight/rgb-session-init.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

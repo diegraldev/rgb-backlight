@@ -44,10 +44,11 @@ brillo sin perder el color ni el efecto que haya puesto OpenRGB, el módulo
 `hid-razer` en el árbol de Linux) e **intercepta todos los paquetes** que se
 envían al teclado. El último se memoriza y se reenvía con el brillo nuevo.
 
-Además, el firmware del teclado lo enciende en *verde estático* al arrancar.
-Como el módulo ya sabe hablar su protocolo, **lo apaga** al detectarlo (el
-LED virtual queda al 0 % y el panel lo refleja fielmente). Al mover el
-deslizador vuelve a encenderse con el color memorizado. Si OpenRGB está
+Además, el firmware del teclado lo enciende por su cuenta (en *blanco
+estático*) cuando el dispositivo termina de inicializarse, así que el
+módulo lo apaga en cuanto lo detecta **y** hay un servicio de usuario que
+vuelve a apagarlo al iniciar la sesión de Plasma (ver más abajo). Al mover
+el deslizador vuelve a encenderse con el color memorizado. Si OpenRGB está
 abierto, su perfil se aplica después y gana, como es lógico.
 
 **Ratón Razer.** Aquí el brillo es un comando independiente, así que no hace
@@ -139,10 +140,42 @@ sudo ./install.sh
 2. compila e instala el plugin QML en `/usr/lib64/qt6/qml/org/rgb/backlight/`;
 3. instala las reglas **udev** que permiten al usuario escribir los atributos;
 4. habilita la carga automática del módulo;
-5. reinicia `upower` y `powerdevil`.
+5. instala el **servicio de sesión** que apaga el teclado al iniciar Plasma;
+6. reinicia `upower` y `powerdevil`.
 
 Después, en el widget *KDE Control Station* → *Edit controls* → *Add new item* →
 **RGB**.
+
+### El teclado arranca apagado
+
+El firmware del Mystic Light enciende su propia luz (blanco) cuando el
+dispositivo termina de inicializarse, es decir, **después** de que el módulo
+del kernel haya enviado su paquete de "apagado". Por eso, apagar el teclado
+en el arranque del kernel no basta: hace falta hacerlo cuando la sesión
+gráfica ya está en marcha.
+
+De eso se encarga el servicio de usuario `rgb-backlight-session.service`:
+
+```ini
+[Unit]
+After=plasma-plasmashell.service
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/rgb-backlight/rgb-session-init.sh
+[Install]
+WantedBy=default.target
+```
+
+El script apaga el teclado por la misma vía que el deslizador de Plasma
+(UPower) y comprueba que se queda apagado, reintentando un poco por si el
+firmware aplica su color por defecto con retraso.
+
+Se puede probar a mano:
+
+```bash
+systemctl --user restart rgb-backlight-session.service
+journalctl --user -u rgb-backlight-session.service
+```
 
 Si el widget se actualiza desde GitHub y se pierden los cambios:
 
@@ -175,7 +208,8 @@ sudo ~/rgb-backlight/uninstall.sh
 
 * El **ratón** guarda su propio estado en memoria, así que al arrancar
   conserva el último lighting que tuviera. El **teclado**, en cambio, lo
-  apagamos nosotros al arrancar (su firmware lo enciende en verde).
+  apagamos nosotros al iniciar la sesión de Plasma (su firmware lo enciende
+  en blanco por su cuenta).
 * El brillo que muestra el panel es el último que aplicó este proyecto; no
   se lee del hardware (el Razer sí lo permitiría, el MSI no).
 * Si el ratón está en un modo de efecto, el selector de color deja de verse
