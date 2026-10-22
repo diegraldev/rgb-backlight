@@ -1,11 +1,11 @@
 [Unit]
-Description=rgb-backlight: apaga la iluminacion del teclado al iniciar sesion
+Description=rgb-backlight: restaura el perfil RGB al iniciar sesion
 Documentation=https://github.com/diegraldev/rgb-backlight
 After=plasma-plasmashell.service
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/share/rgb-backlight/rgb-session-init.sh
+ExecStart=%h/.local/share/rgb-backlight/rgb-profile.sh restore
 RemainAfterExit=yes
 
 [Install]

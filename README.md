@@ -138,46 +138,64 @@ sudo ./install.sh
 
 1. compila e instala el módulo con **DKMS** (se recompila solo al actualizar el kernel);
 2. compila e instala el plugin QML en `/usr/lib64/qt6/qml/org/rgb/backlight/`;
-3. instala las reglas **udev** que permiten al usuario escribir los atributos;
+3. instala las reglas **udev** que permiten al usuario escribir los atributos
+   y desactiva `systemd-backlight` para estos LED;
 4. habilita la carga automática del módulo;
-5. instala el **servicio de sesión** que apaga el teclado al iniciar Plasma;
+5. instala el **perfil** y el servicio de sesión que lo restaura al iniciar Plasma;
 6. reinicia `upower` y `powerdevil`.
 
 Después, en el widget *KDE Control Station* → *Edit controls* → *Add new item* →
 **RGB**.
 
-### El teclado arranca apagado
+### El estado se recuerda entre reinicios (perfil)
 
-El firmware del Mystic Light enciende su propia luz (blanco) cuando el
-dispositivo termina de inicializarse, es decir, **después** de que el módulo
-del kernel haya enviado su paquete de "apagado". Por eso, apagar el teclado
-en el arranque del kernel no basta: hace falta hacerlo cuando la sesión
-gráfica ya está en marcha.
+Encender la PC y encontrarte el teclado en blanco y el ratón con otro color
+es lo normal: cada dispositivo arranca con lo que le apetece. Este proyecto
+lo resuelve guardando un **perfil** con el estado de cada dispositivo y
+devolviéndolo al iniciar sesión.
 
-De eso se encarga el servicio de usuario `rgb-backlight-session.service`:
+* **Guardar**: lo hace el plugin del widget, en cada cambio que aplicas
+  (`~/.config/rgb-backlight/<dispositivo>.state`). Las escrituras se agrupan
+  con un temporizador de 300 ms (al arrastrar un deslizador se generan decenas
+  de cambios) y se hacen de forma **atómica** (`QSaveFile`), así que el perfil
+  nunca queda a medias. El formato es clave=valor, legible y editable a mano:
 
-```ini
-[Unit]
-After=plasma-plasmashell.service
-[Service]
-Type=oneshot
-ExecStart=%h/.local/share/rgb-backlight/rgb-session-init.sh
-[Install]
-WantedBy=default.target
-```
+  ```ini
+  # teclado
+  colors=db0000,ffffff
+  mode=1
+  speed=0
+  brightness=100
+  ```
 
-El script apaga el teclado por la misma vía que el deslizador de Plasma
-(UPower) y comprueba que se queda apagado, reintentando un poco por si el
-firmware aplica su color por defecto con retraso.
+* **Restaurar**: lo hace `rgb-backlight-session.service` al iniciar sesión,
+  aplicando el perfil por la misma vía que el panel (UPower para el brillo del
+  teclado, sysfs para el resto) y escribiendo solo lo que haya cambiado.
 
-Se puede probar a mano:
+* **Reflejarse en el widget**: el plugin lee el estado directamente del módulo
+  al abrir la página, así que lo que ves es siempre el estado real.
+
+También se puede manejar a mano:
 
 ```bash
-systemctl --user restart rgb-backlight-session.service
-journalctl --user -u rgb-backlight-session.service
+~/.local/share/rgb-backlight/rgb-profile.sh show      # perfil + estado real
+~/.local/share/rgb-backlight/rgb-profile.sh save      # guardar el estado actual
+~/.local/share/rgb-backlight/rgb-profile.sh restore   # aplicar el perfil
 ```
 
-Si el widget se actualiza desde GitHub y se pierden los cambios:
+### Por qué se desactiva `systemd-backlight`
+
+systemd guarda el brillo de los LED al apagar y lo restaura al arrancar
+(`systemd-backlight@leds:...service`). Con estos dispositivos eso es un
+problema: el valor guardado se aplica **después** de que el módulo haya
+apagado el teclado, y el módulo, al aplicar ese brillo, reenvía el último
+paquete con su color por defecto. Resultado: teclado blanco al arrancar.
+
+`install.sh` enmascara esas dos instancias para que systemd no toque los LED
+del teclado ni del ratón; la persistencia la lleva el perfil, que sí conoce
+colores, efectos y velocidad.
+
+### Si el widget se actualiza desde GitHub y se pierden los cambios
 
 ```bash
 ~/rgb-backlight/restore-widget.sh
@@ -206,10 +224,9 @@ sudo ~/rgb-backlight/uninstall.sh
 
 ## Limitaciones conocidas
 
-* El **ratón** guarda su propio estado en memoria, así que al arrancar
-  conserva el último lighting que tuviera. El **teclado**, en cambio, lo
-  apagamos nosotros al iniciar la sesión de Plasma (su firmware lo enciende
-  en blanco por su cuenta).
+* El perfil se guarda cuando cambias algo **desde el panel**. Si configuras
+  los dispositivos con OpenRGB, el perfil no se entera: al reiniciar se
+  aplicará el último estado guardado por el widget.
 * El brillo que muestra el panel es el último que aplicó este proyecto; no
   se lee del hardware (el Razer sí lo permitiría, el MSI no).
 * Si el ratón está en un modo de efecto, el selector de color deja de verse

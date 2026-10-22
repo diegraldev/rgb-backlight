@@ -39,6 +39,10 @@ rm -f /etc/modules-load.d/rgb-backlight.conf
 rm -f /etc/udev/rules.d/99-rgb-backlight.rules
 rm -rf "/usr/src/${PKG}-${VER}"
 
+echo "==> Reactivando la gestion de brillo de systemd"
+systemctl unmask systemd-backlight@leds:msi::kbd_backlight.service >/dev/null 2>&1 || true
+systemctl unmask systemd-backlight@leds:razer::logo_backlight.service >/dev/null 2>&1 || true
+
 systemctl restart upower 2>/dev/null || true
 
 echo "Hecho."

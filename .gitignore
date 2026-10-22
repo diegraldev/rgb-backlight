@@ -15,3 +15,6 @@ Module.symvers
 *~
 .vscode/
 .idea/
+
+# MOC generado en la compilacion del plugin
+moc_*.cpp

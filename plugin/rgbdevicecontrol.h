@@ -14,6 +14,8 @@
 #include <QQmlExtensionPlugin>
 #include <QStringList>
 
+class QTimer;
+
 class RgbDeviceControl : public QObject
 {
     Q_OBJECT
@@ -65,9 +67,21 @@ private:
     bool writeValue(const QString &attribute, const QString &value) const;
     void setBrightnessViaUPower(int brightness);
 
+    /*
+     * Perfil del dispositivo.  Cada cambio que se escribe en el modulo se
+     * guarda en ~/.config/rgb-backlight/<dispositivo>.state, de donde el
+     * servicio de sesion lo recupera al iniciar sesion.  Las escrituras se
+     * agrupan con un temporizador (al arrastrar un deslizador se generan
+     * decenas de cambios) para no tocar el fichero en cada uno.
+     */
+    QString profilePath() const;
+    void scheduleProfileSave();
+    void saveProfile();
+
     QString m_device;
     bool m_available = false;
     int m_brightness = 0;
+    QTimer *m_saveTimer = nullptr;
     int m_maxBrightness = 100;
     QColor m_color = QColor(Qt::white);
     QColor m_secondaryColor = QColor(Qt::white);

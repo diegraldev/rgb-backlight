@@ -40,16 +40,25 @@ echo "==> [3/7] Reglas udev"
 sed "s/@GROUP@/${GROUP}/" "${SRC}/udev/99-rgb-backlight.rules" > /etc/udev/rules.d/99-rgb-backlight.rules
 udevadm control --reload-rules
 
+# systemd guarda el brillo de los LED al apagar y lo restaura al arrancar.
+# Para estos LEDs eso pelea con el perfil (es lo que ponia el teclado blanco
+# al arrancar), asi que se desactiva.
+systemctl mask systemd-backlight@leds:msi::kbd_backlight.service >/dev/null 2>&1 || true
+systemctl mask systemd-backlight@leds:razer::logo_backlight.service >/dev/null 2>&1 || true
+rm -f /var/lib/systemd/backlight/*leds:msi::kbd_backlight \
+      /var/lib/systemd/backlight/*leds:razer::logo_backlight 2>/dev/null || true
+
 echo "==> [4/7] Carga automatica"
 cat > /etc/modules-load.d/rgb-backlight.conf <<'EOF'
 rgb-backlight
 EOF
 
-echo "==> [5/7] Servicio de sesion (apagar el teclado al iniciar Plasma)"
+echo "==> [5/7] Perfil y servicio de sesion (restaurar el estado al iniciar Plasma)"
 USER_HOME="$(getent passwd "${USER_NAME}" | cut -d: -f6)"
 USER_UID="$(id -u "${USER_NAME}")"
 install -d -m 755 "${USER_HOME}/.local/share/rgb-backlight"
-install -m 755 "${SRC}/tools/rgb-session-init.sh" "${USER_HOME}/.local/share/rgb-backlight/rgb-session-init.sh"
+install -m 755 "${SRC}/tools/rgb-profile.sh" "${USER_HOME}/.local/share/rgb-backlight/rgb-profile.sh"
+rm -f "${USER_HOME}/.local/share/rgb-backlight/rgb-session-init.sh"
 install -d -m 755 "${USER_HOME}/.config/systemd/user"
 install -m 644 "${SRC}/systemd/rgb-backlight-session.service" "${USER_HOME}/.config/systemd/user/rgb-backlight-session.service"
 

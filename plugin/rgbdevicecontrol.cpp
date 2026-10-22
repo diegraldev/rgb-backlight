@@ -3,10 +3,13 @@
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QDBusReply>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QQmlEngine>
 #include <QQmlExtensionPlugin>
+#include <QSaveFile>
+#include <QTimer>
 
 namespace
 {
@@ -19,6 +22,15 @@ const QString MouseLed = QStringLiteral("/sys/class/leds/razer::logo_backlight")
 const QString UPowerService = QStringLiteral("org.freedesktop.UPower");
 const QString UPowerPath = QStringLiteral("/org/freedesktop/UPower/KbdBacklight");
 const QString UPowerInterface = QStringLiteral("org.freedesktop.UPower.KbdBacklight");
+
+/* Se espera a que el usuario deje de mover el control antes de guardar el
+ * perfil, para no escribir el fichero en cada paso intermedio. */
+const int ProfileSaveDelayMs = 300;
+
+QByteArray colorHex(const QColor &color)
+{
+    return color.name(QColor::HexRgb).mid(1).toLatin1();
+}
 }
 
 RgbDeviceControl::RgbDeviceControl(QObject *parent)
@@ -67,6 +79,67 @@ bool RgbDeviceControl::writeValue(const QString &attribute, const QString &value
         return false;
     const QByteArray data = value.toUtf8();
     return file.write(data) == data.size();
+}
+
+QString RgbDeviceControl::profilePath() const
+{
+    return QDir::homePath() + QStringLiteral("/.config/rgb-backlight/")
+            + (m_device == MouseDevice ? QStringLiteral("mouse.state")
+                                       : QStringLiteral("keyboard.state"));
+}
+
+void RgbDeviceControl::scheduleProfileSave()
+{
+    if (m_device.isEmpty() || !m_available)
+        return;
+
+    if (!m_saveTimer) {
+        m_saveTimer = new QTimer(this);
+        m_saveTimer->setSingleShot(true);
+        m_saveTimer->setInterval(ProfileSaveDelayMs);
+        connect(m_saveTimer, &QTimer::timeout,
+                this, &RgbDeviceControl::saveProfile);
+    }
+
+    m_saveTimer->start();
+}
+
+void RgbDeviceControl::saveProfile()
+{
+    if (m_device.isEmpty() || !m_available)
+        return;
+
+    const QString path = profilePath();
+    if (!QDir().mkpath(QFileInfo(path).absolutePath()))
+        return;
+
+    QByteArray data;
+    data += "# rgb-backlight: estado del dispositivo (se restaura al iniciar sesion)\n";
+
+    if (m_device == MouseDevice) {
+        data += "color=" + colorHex(m_color) + '\n';
+        data += "color2=" + colorHex(m_secondaryColor) + '\n';
+        data += "effect=" + QByteArray::number(m_effect) + '\n';
+        data += "speed=" + QByteArray::number(m_speed) + '\n';
+    } else {
+        data += "colors=" + colorHex(m_color) + ',' + colorHex(m_secondaryColor) + '\n';
+        data += "mode=" + QByteArray::number(m_effect) + '\n';
+        data += "speed=" + QByteArray::number(m_speed) + '\n';
+    }
+    data += "brightness=" + QByteArray::number(m_brightness) + '\n';
+
+    /* QSaveFile escribe a un temporal y lo renombra: el perfil nunca queda
+     * a medias aunque el sistema se apague en ese momento. */
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+        return;
+
+    if (file.write(data) != data.size()) {
+        file.cancelWriting();
+        return;
+    }
+
+    file.commit();
 }
 
 void RgbDeviceControl::refresh()
@@ -150,6 +223,7 @@ void RgbDeviceControl::setBrightness(int brightness)
             return;
         m_brightness = brightness;
         Q_EMIT brightnessChanged();
+        scheduleProfileSave();
         return;
     }
 
@@ -171,6 +245,7 @@ void RgbDeviceControl::setBrightnessViaUPower(int brightness)
 
     m_brightness = brightness;
     Q_EMIT brightnessChanged();
+    scheduleProfileSave();
 }
 
 QColor RgbDeviceControl::color() const
@@ -196,6 +271,7 @@ void RgbDeviceControl::setColor(const QColor &color)
 
     m_color = color;
     Q_EMIT colorChanged();
+    scheduleProfileSave();
 }
 
 bool RgbDeviceControl::hasSecondaryColor() const
@@ -225,6 +301,7 @@ void RgbDeviceControl::setSecondaryColor(const QColor &color)
 
     m_secondaryColor = color;
     Q_EMIT colorChanged();
+    scheduleProfileSave();
 }
 
 QStringList RgbDeviceControl::effects() const
@@ -270,6 +347,7 @@ void RgbDeviceControl::setEffect(int effect)
 
     m_effect = effect;
     Q_EMIT effectChanged();
+    scheduleProfileSave();
 }
 
 bool RgbDeviceControl::hasSpeed() const
@@ -296,6 +374,7 @@ void RgbDeviceControl::setSpeed(int speed)
 
     m_speed = speed;
     Q_EMIT speedChanged();
+    scheduleProfileSave();
 }
 
 void RgbBacklightPlugin::registerTypes(const char *uri)
