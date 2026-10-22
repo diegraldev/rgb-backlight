@@ -17,6 +17,13 @@ Con este proyecto:
 * y ambos aparecen en un panel **RGB** dentro del widget *KDE Control
   Station*, con brillo, color, efecto y velocidad.
 
+## Captura
+
+![Panel RGB del widget KDE Control Station](docs/rgb-panel.jpg)
+
+*Sección **RGB** del widget KDE Control Station: una entrada plegable por
+dispositivo (teclado y ratón), con brillo, colores, efecto y velocidad.*
+
 ---
 
 ## Cómo funciona
